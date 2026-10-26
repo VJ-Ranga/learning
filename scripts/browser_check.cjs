@@ -23,7 +23,7 @@ const fs = require('fs');
  await page.waitForFunction(() => !document.getElementById('run-code').disabled, null, {timeout:120000});
  console.log('RUN OUTPUT:',await page.locator('#output').innerText());
  if (!(await page.locator('#output').innerText()).includes('Maya will be 25 next year')) throw Error('Python input runner failed');
- await page.locator('#challenge-tab').click();
+ await page.locator('#checkpoint-tab').click();
  await page.locator('input[value="str"]').check();
  await page.locator('#check-code').click();
  await page.waitForFunction(() => !document.getElementById('check-code').disabled,null,{timeout:120000});

@@ -54,7 +54,7 @@ Download runnable worked programs from the sidebar. The Python files in `termina
 
 ## Revisit previous lessons
 
-Every mission has Previous mission / All missions / Next mission links and a numbered map of all ten missions. The current lesson is highlighted; completed and in-progress marks are displayed separately. Use Back to lesson inside a challenge to reread explanations and examples. Navigating does not change marks, and device challenge drafts remain available when you return. Journey cards explicitly open their named lesson; a partial result such as 80/100 is marked In progress, not Completed.
+The primary navigation shows the three parts inside the current mission: **1 Learn the skill → 2 Write the program → 3 Answer the checkpoint**. Previous step and Next stay on this mission, preserving its program and answer. Step 3 checks/saves both parts; a next-mission action appears after completion. Other chapter missions remain accessible in a secondary collapsed menu, with their own previous/all/next links and progress map. Navigating does not change marks, and device challenge drafts remain available when you return. Journey cards explicitly open their named lesson; a partial result such as 80/100 is marked In progress, not Completed.
 
 ## Scores and honest limits
 
@@ -186,3 +186,5 @@ References: [Vercel Django](https://vercel.com/docs/frameworks/full-stack/django
 `scripts/feedback_check.cjs` verifies immediate correct/incorrect feedback, stale-result clearing, two contextual prompts, answer-gated review and manual-copy fallback, large next navigation and completion feedback on desktop/mobile. It uses a contract response fixture for program-save feedback so real learner marks are not modified.
 
 `scripts/navigation_check.cjs` verifies exact dashboard-card destinations, previous/next boundaries, all-mission map jumps, back-to-lesson behavior, draft preservation across navigation, mobile layout and unchanged marks. It never submits an attempt.
+
+`scripts/mission_steps_check.cjs` verifies that primary Previous/Next moves through the three parts of the same mission, preserves code and selected answers, leaves course navigation secondary, and works on mobile without changing marks.

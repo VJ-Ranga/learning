@@ -9,6 +9,7 @@
   const initialInput = input.value;
   const initialCode = editor.value;
   let mode = 'learn';
+  let currentStep = 'learn';
   let activeJob = null, sandboxReady = false, checkingCheckpoint = false;
   let reviewedAnswer = null;
   let resolveReady;
@@ -42,7 +43,7 @@
     }
     const p = document.createElement('p'); p.textContent = message; box.append(p);
     if (summary?.complete) {
-      const next = $('next-mission-card');
+      const next = $('next-mission-card'); next.hidden = false;
       const action = document.createElement('a'); action.className = 'button primary large-action';
       action.href = next.href; action.textContent = next.querySelector('strong').textContent + ' →';
       box.append(action);
@@ -130,35 +131,49 @@
     }
   }));
   $('close-ai-prompt').onclick = () => $('ai-prompt-dialog').close();
-  function showPane(id) {
+  function showPane(id, targetStep = 'code') {
     if (activeJob || checkingCheckpoint) return;
     states[mode].code = editor.value;
     states[mode].input = input.value;
     states[mode].output = output.textContent;
-    mode = id === 'challenge-pane' ? 'challenge' : 'learn';
-    for (const tab of document.querySelectorAll('[data-pane]')) {
-      const selected = tab.dataset.pane === id;
+    currentStep = id === 'learn-pane' ? 'learn' : targetStep;
+    mode = currentStep === 'learn' ? 'learn' : 'challenge';
+    for (const tab of document.querySelectorAll('[data-mission-step]')) {
+      const selected = tab.dataset.missionStep === currentStep;
       tab.classList.toggle('active', selected);
       tab.setAttribute('aria-selected', String(selected));
-      $(tab.dataset.pane).hidden = !selected;
     }
+    $('learn-pane').hidden = mode !== 'learn';
+    $('challenge-pane').hidden = mode !== 'challenge';
+    $('challenge-pane').setAttribute('aria-labelledby', currentStep === 'checkpoint' ? 'checkpoint-tab' : 'challenge-tab');
+    $('program-step').hidden = currentStep !== 'code';
+    $('checkpoint-step').hidden = currentStep !== 'checkpoint';
     editor.value = states[mode].code;
     input.value = states[mode].input;
     output.textContent = states[mode].output;
     $('editor-filename').textContent = mode === 'learn' ? 'practice.py' : 'mission.py';
-    $('editor-purpose').textContent = mode === 'learn' ? 'Lesson practice is separate from your challenge work.' : 'This is your independent challenge draft.';
+    $('editor-purpose').textContent = mode === 'learn' ? 'Lesson practice is separate from your challenge work.' : 'Your program is kept while you move between steps 2 and 3.';
     $('draft-status').textContent = mode === 'learn' ? 'Lesson practice draft' : 'Your challenge draft';
-    $('check-code').hidden = mode !== 'challenge';
+    $('check-code').hidden = currentStep !== 'checkpoint';
     $('feedback').hidden = true;
     if (states[mode].feedback) notify(states[mode].feedback.message, states[mode].feedback.success, states[mode].feedback.summary);
-    $('workflow-title').textContent = mode === 'learn' ? 'Step 1: Learn and practise' : 'Step 2: Complete your mission';
-    $('workflow-description').textContent = mode === 'learn' ? 'Read the explanations, run the example, then press Next: try your mission.' : 'Write your program → check your checkpoint answer → check and save the program. Look for Mission complete before moving on.';
+    const stepNumber = {learn:1,code:2,checkpoint:3}[currentStep];
+    const headings = {learn:'Step 1 of 3: Learn the skill',code:'Step 2 of 3: Write the program',checkpoint:'Step 3 of 3: Answer the checkpoint'};
+    const descriptions = {learn:'Read the explanation and try the practice example. Next opens the coding task inside this same mission.',code:'Write and run your own program. Next opens the checkpoint inside this same mission; your code stays here.',checkpoint:'Choose an answer and check it. Then use Check program & save to record both parts. You can go back to your program at any time.'};
+    $('workflow-title').textContent = headings[currentStep];
+    $('workflow-description').textContent = descriptions[currentStep];
+    $('step-position').textContent = `Step ${stepNumber} of 3 · this mission`;
+    $('previous-step').disabled = currentStep === 'learn';
+    $('next-step').hidden = currentStep === 'checkpoint';
+    $('next-step').textContent = currentStep === 'learn' ? 'Next: write the program →' : 'Next: answer the checkpoint →';
   }
-  document.querySelectorAll('[data-pane]').forEach(tab => tab.addEventListener('click', () => showPane(tab.dataset.pane)));
-  document.querySelectorAll('[data-back-to-lesson]').forEach(button => button.addEventListener('click', () => {
-    showPane('learn-pane'); $('learn-tab').focus(); $('learn-tab').scrollIntoView({block:'start'});
-  }));
-  $('go-challenge').onclick = () => { showPane('challenge-pane'); $('challenge-tab').focus(); };
+  document.querySelectorAll('[data-mission-step]').forEach(tab => tab.addEventListener('click', () => showPane(tab.dataset.missionStep === 'learn' ? 'learn-pane' : 'challenge-pane', tab.dataset.missionStep)));
+  document.querySelectorAll('[data-back-to-lesson]').forEach(button => button.addEventListener('click', () => {showPane('learn-pane'); $('learn-tab').focus();}));
+  document.querySelectorAll('[data-back-to-code]').forEach(button => button.addEventListener('click', () => {showPane('challenge-pane','code'); $('challenge-tab').focus();}));
+  $('go-challenge').onclick = () => { showPane('challenge-pane','code'); $('challenge-tab').focus(); };
+  $('go-checkpoint').onclick = () => { showPane('challenge-pane','checkpoint'); $('checkpoint-tab').focus(); };
+  $('previous-step').onclick = () => showPane(currentStep === 'code' ? 'learn-pane' : 'challenge-pane','code');
+  $('next-step').onclick = () => showPane('challenge-pane',currentStep === 'learn' ? 'code' : 'checkpoint');
   function saveDraft() {
     states[mode].code = editor.value;
     states[mode].feedback = null; $('feedback').hidden = true;
@@ -200,9 +215,10 @@
     } catch (error) { notify(error.message, false); }
   };
   function busy(value) {
-    for (const id of ['run-code', 'check-code', 'reset-code', 'load-example', 'learn-tab', 'challenge-tab', 'go-challenge', 'check-question']) $(id).disabled = value;
+    for (const id of ['run-code', 'check-code', 'reset-code', 'load-example', 'learn-tab', 'challenge-tab', 'checkpoint-tab', 'go-challenge', 'go-checkpoint', 'previous-step', 'next-step', 'check-question']) $(id).disabled = value;
     document.querySelectorAll('[name=quiz]').forEach(radio => { radio.disabled = value; });
-    document.querySelectorAll('[data-back-to-lesson]').forEach(button => { button.disabled = value; });
+    document.querySelectorAll('[data-back-to-lesson], [data-back-to-code]').forEach(button => { button.disabled = value; });
+    if (!value) $('previous-step').disabled = currentStep === 'learn';
     editor.readOnly = value;
     $('stop-code').hidden = !value;
   }
@@ -219,7 +235,7 @@
     if (!job.check) {
       output.textContent = data.results.map(result => result.output + (result.error ? `\n${result.error}` : '')).join('\n') || '(Program finished with no output.)';
       const hasError = data.results.some(result => result.error);
-      notify(hasError ? 'Your program hit an error. Read the terminal message and correct the indicated line.' : (mode === 'learn' ? '✓ Your practice program ran successfully. When ready, press Next: try your mission on the left.' : '✓ Your program ran. To find out whether it meets the challenge, use Check program & save.'), !hasError);
+      notify(hasError ? 'Your program hit an error. Read the terminal message and correct the indicated line.' : (mode === 'learn' ? '✓ Your practice program ran successfully. When ready, press Next: write the program.' : '✓ Your program ran. Next, answer the checkpoint in step 3, then check and save both parts.'), !hasError);
       finish(); return;
     }
     const results = data.results;
@@ -247,11 +263,11 @@
   });
   async function run(check) {
     if (activeJob || checkingCheckpoint) return;
-    if (check && mode !== 'challenge') { showPane('challenge-pane'); return; }
+    if (check && currentStep !== 'checkpoint') { showPane('challenge-pane','checkpoint'); return; }
     if (!editor.value.trim()) { notify('Write a line of Python first, then run it.', false); return; }
     if (editor.value.length > 20000) { notify('Keep this beginner program under 20,000 characters.', false); return; }
     const answer = document.querySelector('[name=quiz]:checked')?.value;
-    if (check && !answer) { showPane('challenge-pane'); notify('Choose your checkpoint answer, then press Check program & save again.', false); return; }
+    if (check && !answer) { showPane('challenge-pane','checkpoint'); notify('Choose your checkpoint answer, then press Check program & save again.', false); return; }
     states[mode].feedback = null;
     busy(true); $('feedback').hidden = true; output.textContent = 'Preparing Python…';
     const id = crypto.randomUUID();
