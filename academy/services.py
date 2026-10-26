@@ -15,14 +15,19 @@ def progress(user):
     return {'best': best, 'completed_slugs': list(completed), 'completed': len(completed), 'xp': sum(best.values()), 'total': len(MISSIONS), 'percent': round(len(completed) / len(MISSIONS) * 100), 'leaderboard': leaderboard}
 
 
+def check_checkpoint(mission, payload):
+    if not isinstance(payload, dict) or not isinstance(payload.get('answer'), str) or payload['answer'] not in {value for value, _ in mission['options']}:
+        raise ValueError('Choose one checkpoint answer before checking it.')
+    return {'correct': payload['answer'] == mission['answer'], 'correct_option': mission['answer'], 'explanation': mission['quiz_explanation']}
+
+
 def assess(mission, payload):
     if not isinstance(payload, dict):
         raise ValueError('Send an object containing your code, answer and test results.')
     code, answer, results = (payload.get(k) for k in ('code', 'quiz_answer', 'results'))
     if not isinstance(code, str) or not code.strip() or len(code) > 20000:
         raise ValueError('Your program must contain between 1 and 20,000 characters.')
-    if not isinstance(answer, str) or answer not in {v for v, _ in mission['options']}:
-        raise ValueError('Choose an answer to the checkpoint question.')
+    checkpoint = check_checkpoint(mission, {'answer': answer})
     if not isinstance(results, list) or len(results) != len(mission['cases']):
         raise ValueError('Run all challenge checks before saving this attempt.')
     details = []
@@ -32,6 +37,6 @@ def assess(mission, payload):
         passed = not result['error'] and result['output'].replace('\r\n', '\n').strip() == case['expected'].strip()
         details.append({'passed': passed, 'output': result['output'], 'error': result['error']})
     code_score = round(80 * sum(d['passed'] for d in details) / len(details))
-    quiz_correct = answer == mission['answer']
+    quiz_correct = checkpoint['correct']
     score = code_score + (20 if quiz_correct else 0)
-    return {'score': score, 'passed': all(d['passed'] for d in details) and quiz_correct, 'details': details, 'quiz_correct': quiz_correct, 'quiz_explanation': mission['quiz_explanation']}
+    return {'score': score, 'passed': all(d['passed'] for d in details) and quiz_correct, 'details': details, 'quiz_correct': quiz_correct, 'quiz_explanation': mission['quiz_explanation'], 'correct_option': checkpoint['correct_option']}

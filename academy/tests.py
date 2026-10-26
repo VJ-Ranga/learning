@@ -33,6 +33,26 @@ class QuestTests(TestCase):
         self.assertTrue(self.learner.check_password('New-strong-password-2026'))
         self.assertEqual(self.client.get('/').status_code, 200)
 
+    def test_checkpoint_feedback_is_immediate_without_awarding_marks(self):
+        from academy.models import Attempt
+        self.client.force_login(self.learner)
+        response = self.client.post('/api/missions/hello/checkpoint/', json.dumps({'answer':'input'}), content_type='application/json')
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.json()['correct'])
+        self.assertEqual(response.json()['correct_option'], 'print')
+        response = self.client.post('/api/missions/hello/checkpoint/', json.dumps({'answer':'print'}), content_type='application/json')
+        self.assertTrue(response.json()['correct'])
+        self.assertTrue(response.json()['explanation'])
+        self.assertEqual(Attempt.objects.count(), 0)
+        self.assertEqual(self.client.get('/api/progress/').json()['xp'], 0)
+
+    def test_checkpoint_rejects_anonymous_and_invalid_answers(self):
+        self.assertEqual(self.client.post('/api/missions/hello/checkpoint/', '{}', content_type='application/json').status_code, 302)
+        self.client.force_login(self.learner)
+        for payload in ({}, {'answer':[]}, {'answer':'missing'}, []):
+            response = self.client.post('/api/missions/hello/checkpoint/', json.dumps(payload), content_type='application/json')
+            self.assertEqual(response.status_code, 400)
+
     def test_submission_requires_authentication(self):
         self.assertEqual(self.submit().status_code, 302)
 

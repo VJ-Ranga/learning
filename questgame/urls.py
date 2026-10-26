@@ -11,6 +11,7 @@ urlpatterns = [
     path('password/change/', PasswordChangeView.as_view(template_name='registration/password_change.html', success_url='/password/changed/'), name='password_change'),
     path('password/changed/', PasswordChangeDoneView.as_view(template_name='registration/password_changed.html'), name='password_change_done'),
     path('missions/<slug:slug>/', views.mission_detail, name='mission'),
+    path('api/missions/<slug:slug>/checkpoint/', views.checkpoint_feedback, name='checkpoint_feedback'),
     path('api/missions/<slug:slug>/attempt/', views.attempt, name='attempt'),
     path('api/missions/<slug:slug>/solution/', views.solution, name='solution'),
     path('api/progress/', views.progress_api, name='progress'),

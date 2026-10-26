@@ -16,7 +16,7 @@ from django.views.decorators.clickjacking import xframe_options_exempt
 from django.views.decorators.http import require_GET, require_POST
 from .curriculum import MISSIONS, BY_SLUG
 from .models import Attempt, AuthWindow
-from .services import assess, progress
+from .services import assess, progress, check_checkpoint
 
 
 def auth_limited(request, scope):
@@ -117,3 +117,17 @@ def runner(request):
 @require_GET
 def setup_help(request):
     return render(request, 'academy/help.html')
+
+
+@login_required
+@require_POST
+def checkpoint_feedback(request, slug):
+    mission = BY_SLUG.get(slug)
+    if not mission:
+        raise Http404
+    try:
+        if len(request.body) > 1000:
+            raise ValueError('Send just your selected checkpoint answer.')
+        return JsonResponse(check_checkpoint(mission, json.loads(request.body)))
+    except (ValueError, UnicodeDecodeError) as error:
+        return JsonResponse({'error': str(error)}, status=400)
