@@ -46,9 +46,9 @@ Open `/help/` or choose **Setup & basic help** from the navigation. This public 
 9. Exceptions and input validation.
 10. A support-cost calculator combining functions, dictionaries and validation.
 
-Each lesson has explanations, a worked example, a trace, a challenge, two hints and a checkpoint. Use **Run code** for experiments. Use **Check & save** to run all test inputs and save an attempt. Program input is entered in advance, one value per line; the output panel is terminal-style, not an interactive OS shell.
+Each lesson has explanations, a worked example, a trace, a challenge, two hints and an independent code-reasoning checkpoint. Checkpoint choices are shuffled. The lesson practice editor and challenge editor keep separate code, input and output, so running a worked example never replaces your challenge draft. Use **Run code** for experiments. Use **Check & save** to run all test inputs and save an attempt. Program input is entered in advance, one value per line; the output panel is terminal-style, not an interactive OS shell.
 
-The editor keeps a device draft per learner and mission. Submitted code is also stored in the account and used when no device draft exists. Unsaved device drafts do not sync between computers. Download your program or submit it before changing devices. Lesson examples and reset actions ask before replacing your editor contents.
+The editor keeps separate lesson-practice and challenge device drafts per learner and mission. Older device drafts containing the exact lesson example are treated as practice code, while other earlier work is preserved as challenge work. Submitted challenge code is also stored in the account and used when no challenge device draft exists. Unsaved device drafts do not sync between computers. Download your program or submit it before changing devices. Lesson examples and reset actions ask before replacing your editor contents.
 
 Download runnable worked programs from the sidebar. The Python files in `terminal-programs/` also run directly on a computer. Local runs do not automatically report results to the website.
 
@@ -176,3 +176,5 @@ python manage.py check --deploy
 - `LEARNING_PLAN.md`: longer route through desktop UI, databases and Django.
 
 References: [Vercel Django](https://vercel.com/docs/frameworks/full-stack/django), [Neon plans](https://neon.com/pricing), [Django deployment checklist](https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/).
+
+`scripts/checkpoint_check.cjs` verifies separate editors, migration of legacy example drafts, challenge draft preservation after tab switches/reloads, separate terminal outputs and mobile layout. It uses a fresh browser context and does not submit attempts. Set `QUEST_BASE_URL` to choose local or hosted verification.

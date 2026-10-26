@@ -1,6 +1,7 @@
 import hashlib
 import io
 import json
+from random import SystemRandom
 import zipfile
 from datetime import timedelta
 from pathlib import Path
@@ -54,6 +55,7 @@ def mission_detail(request, slug):
     if not mission:
         raise Http404
     index = MISSIONS.index(mission)
+    mission = {**mission, 'options': SystemRandom().sample(mission['options'], len(mission['options']))}
     latest = Attempt.objects.filter(user=request.user, mission_slug=slug).order_by('-created_at', '-pk').first()
     public = {k: v for k, v in mission.items() if k not in ('solution', 'answer', 'quiz_explanation')}
     return render(request, 'academy/mission.html', {'mission': mission, 'mission_data': public, 'number': index + 1, 'missions': MISSIONS, 'code': latest.code if latest else mission['starter'], 'latest': latest, 'next_mission': MISSIONS[index + 1] if index + 1 < len(MISSIONS) else None})

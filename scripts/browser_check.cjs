@@ -16,6 +16,7 @@ const fs = require('fs');
  await Promise.all([page.waitForURL('http://127.0.0.1:8001/'), page.getByRole('button',{name:'Continue the quest'}).click()]);
  await page.screenshot({path:'artifacts/dashboard-desktop.png',fullPage:true});
  await page.goto('http://127.0.0.1:8001/missions/input/');
+ await page.locator('#challenge-tab').click();
  await page.locator('#code').fill('name = input()\nage = int(input())\nprint(f"{name} will be {age + 1} next year")');
  await page.locator('#program-input').fill('Maya\n24');
  await page.locator('#run-code').click();

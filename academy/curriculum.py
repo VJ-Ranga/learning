@@ -141,4 +141,10 @@ mission('final-mission', 'The support desk', 'Combine your skills in a real mini
     'def calculate_total(rate, hours):\n    return rate * hours\n\nrates = {"basic": 10, "urgent": 20}\nservice = input().strip().lower()\nhours_text = input()\nif service not in rates:\n    print("Unknown service")\nelse:\n    try:\n        hours = float(hours_text)\n        if hours < 0:\n            print("Invalid hours")\n        else:\n            total = calculate_total(rates[service], hours)\n            print(f"Total: {total:.2f}")\n    except ValueError:\n        print("Invalid hours")'),
 ]
 
+from .checkpoints import CHECKPOINTS
+
+for _mission in MISSIONS:
+    _question, _code, _options, _answer, _explanation = CHECKPOINTS[_mission['slug']]
+    _mission.update(question=_question, question_code=_code, options=_options, answer=_answer, quiz_explanation=_explanation)
+
 BY_SLUG = {m['slug']: m for m in MISSIONS}

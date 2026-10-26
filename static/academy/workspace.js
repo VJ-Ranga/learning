@@ -5,25 +5,64 @@
   const $ = (id) => document.getElementById(id);
   const editor = $('code'), input = $('program-input'), output = $('output');
   const iframe = $('python-sandbox');
-  const draftKey = `python-quest:${learner}:${mission.slug}:v${mission.version}`;
+  const legacyKey = `python-quest:${learner}:${mission.slug}:v${mission.version}`;
+  const initialInput = input.value;
+  const initialCode = editor.value;
+  let mode = 'learn';
   let activeJob = null, sandboxReady = false;
   let resolveReady;
   const ready = new Promise((resolve) => { resolveReady = resolve; });
+  const states = {
+    learn: {code:mission.example, input:initialInput, output:'Run the example, change it, and see what happens.'},
+    challenge: {code:initialCode, input:initialInput, output:'Write your own program. Expected output describes the goal.'}
+  };
+  try {
+    const legacy = localStorage.getItem(legacyKey);
+    const challengeDraft = localStorage.getItem(legacyKey + ':challenge');
+    const practiceDraft = localStorage.getItem(legacyKey + ':learn');
+    if (challengeDraft !== null) states.challenge.code = challengeDraft;
+    else if (legacy !== null && legacy !== mission.example) states.challenge.code = legacy;
+    if (practiceDraft !== null) states.learn.code = practiceDraft;
+    else if (legacy === mission.example) states.learn.code = legacy;
+  } catch {}
+  function notify(message, success) {
+    states[mode].feedback = {message, success};
+    const box = $('feedback'); box.hidden = false; box.className = `feedback${success ? '' : ' needs-work'}`;
+    box.replaceChildren(); const p = document.createElement('p'); p.textContent = message; box.append(p);
+  }
   function showPane(id) {
+    if (activeJob) return;
+    states[mode].code = editor.value;
+    states[mode].input = input.value;
+    states[mode].output = output.textContent;
+    mode = id === 'challenge-pane' ? 'challenge' : 'learn';
     for (const tab of document.querySelectorAll('[data-pane]')) {
       const selected = tab.dataset.pane === id;
       tab.classList.toggle('active', selected);
       tab.setAttribute('aria-selected', String(selected));
       $(tab.dataset.pane).hidden = !selected;
     }
+    editor.value = states[mode].code;
+    input.value = states[mode].input;
+    output.textContent = states[mode].output;
+    $('editor-filename').textContent = mode === 'learn' ? 'practice.py' : 'mission.py';
+    $('editor-purpose').textContent = mode === 'learn' ? 'Lesson practice is separate from your challenge work.' : 'This is your independent challenge draft.';
+    $('draft-status').textContent = mode === 'learn' ? 'Lesson practice draft' : 'Your challenge draft';
+    $('check-code').hidden = mode !== 'challenge';
+    $('feedback').hidden = true;
+    if (states[mode].feedback) notify(states[mode].feedback.message, states[mode].feedback.success);
   }
   document.querySelectorAll('[data-pane]').forEach(tab => tab.addEventListener('click', () => showPane(tab.dataset.pane)));
   $('go-challenge').onclick = () => { showPane('challenge-pane'); $('challenge-tab').focus(); };
   function saveDraft() {
-    try { localStorage.setItem(draftKey, editor.value); $('draft-status').textContent = 'Draft saved on this device'; }
+    states[mode].code = editor.value;
+    try { localStorage.setItem(legacyKey + ':' + mode, editor.value); $('draft-status').textContent = `${mode === 'learn' ? 'Practice' : 'Challenge'} draft saved on this device`; }
     catch { $('draft-status').textContent = 'Device draft storage unavailable'; }
   }
-  try { const draft = localStorage.getItem(draftKey); if (draft !== null) { editor.value = draft; $('draft-status').textContent = 'Device draft restored'; } } catch {}
+  // Initialize without copying the server's challenge draft into the practice buffer.
+  editor.value = states.learn.code;
+  output.textContent = states.learn.output;
+  showPane('learn-pane');
   editor.addEventListener('input', saveDraft);
   editor.addEventListener('keydown', (event) => {
     if (event.key === 'Tab') {
@@ -34,16 +73,16 @@
     if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) { event.preventDefault(); run(false); }
   });
   $('load-example').onclick = () => {
-    if (editor.value !== mission.starter && editor.value !== mission.example && !confirm('Replace the editor with the lesson example? Download your work first if you want to keep it.')) return;
+    if (editor.value !== mission.example && !confirm('Replace this practice draft with the lesson example? Your challenge draft stays separate.')) return;
     editor.value = mission.example; saveDraft(); editor.focus();
   };
   $('reset-code').onclick = () => {
-    if (!confirm('Reset the editor to the challenge starter? This replaces the device draft. Your submitted attempts remain saved.')) return;
-    editor.value = mission.starter; saveDraft();
+    if (!confirm(mode === 'learn' ? 'Reset your practice draft to the lesson example? Your challenge work stays separate.' : 'Reset your challenge draft to its starter? Submitted attempts remain saved.')) return;
+    editor.value = mode === 'learn' ? mission.example : mission.starter; saveDraft();
   };
   $('download-code').onclick = () => {
     const url = URL.createObjectURL(new Blob([editor.value], {type:'text/x-python'}));
-    const anchor = document.createElement('a'); anchor.href = url; anchor.download = `${mission.slug}.py`; anchor.click();
+    const anchor = document.createElement('a'); anchor.href = url; anchor.download = `${mission.slug}-${mode === 'learn' ? 'practice' : 'challenge'}.py`; anchor.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
   $('show-solution').onclick = async () => {
@@ -54,15 +93,11 @@
     } catch (error) { notify(error.message, false); }
   };
   function busy(value) {
-    for (const id of ['run-code', 'check-code', 'reset-code', 'load-example']) $(id).disabled = value;
+    for (const id of ['run-code', 'check-code', 'reset-code', 'load-example', 'learn-tab', 'challenge-tab', 'go-challenge']) $(id).disabled = value;
     editor.readOnly = value;
     $('stop-code').hidden = !value;
   }
-  function notify(message, success) {
-    const box = $('feedback'); box.hidden = false; box.className = `feedback${success ? '' : ' needs-work'}`;
-    box.replaceChildren(); const p = document.createElement('p'); p.textContent = message; box.append(p);
-  }
-  function finish() { activeJob = null; busy(false); $('runner-state').textContent = 'Ready to run'; }
+  function finish() { states[mode].output = output.textContent; activeJob = null; busy(false); $('runner-state').textContent = 'Ready to run'; }
   window.addEventListener('message', async (event) => {
     if (event.source !== iframe.contentWindow || event.data?.channel !== 'python-quest') return;
     const data = event.data;
@@ -99,6 +134,7 @@
   });
   async function run(check) {
     if (activeJob) return;
+    if (check && mode !== 'challenge') { showPane('challenge-pane'); return; }
     if (!editor.value.trim()) { notify('Write a line of Python first, then run it.', false); return; }
     if (editor.value.length > 20000) { notify('Keep this beginner program under 20,000 characters.', false); return; }
     const answer = document.querySelector('[name=quiz]:checked')?.value;
