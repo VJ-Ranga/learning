@@ -53,6 +53,28 @@ class QuestTests(TestCase):
             response = self.client.post('/api/missions/hello/checkpoint/', json.dumps(payload), content_type='application/json')
             self.assertEqual(response.status_code, 400)
 
+    def test_mission_navigation_has_previous_next_and_all_ten_statuses(self):
+        self.client.force_login(self.learner)
+        self.submit(quiz_answer='input')
+        response = self.client.get('/missions/loops/')
+        self.assertEqual(response.context['previous_mission']['slug'], 'decisions')
+        self.assertEqual(response.context['next_mission']['slug'], 'lists')
+        navigation = response.context['mission_navigation']
+        self.assertEqual(len(navigation), 10)
+        self.assertEqual(navigation[0]['slug'], 'hello')
+        self.assertEqual(navigation[0]['status'], 'In progress')
+        self.assertEqual(navigation[0]['best'], 80)
+        self.assertTrue(navigation[5]['current'])
+        self.assertEqual(navigation[9]['slug'], 'final-mission')
+        self.assertEqual(self.client.get('/api/progress/').json()['xp'], 80)
+
+    def test_first_and_final_missions_have_correct_navigation_boundaries(self):
+        self.client.force_login(self.learner)
+        self.assertIsNone(self.client.get('/missions/hello/').context['previous_mission'])
+        final = self.client.get('/missions/final-mission/')
+        self.assertEqual(final.context['previous_mission']['slug'], 'validation')
+        self.assertIsNone(final.context['next_mission'])
+
     def test_submission_requires_authentication(self):
         self.assertEqual(self.submit().status_code, 302)
 

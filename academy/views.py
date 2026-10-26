@@ -16,7 +16,7 @@ from django.views.decorators.clickjacking import xframe_options_exempt
 from django.views.decorators.http import require_GET, require_POST
 from .curriculum import MISSIONS, BY_SLUG
 from .models import Attempt, AuthWindow
-from .services import assess, progress, check_checkpoint
+from .services import assess, progress, check_checkpoint, build_mission_navigation
 
 
 def auth_limited(request, scope):
@@ -58,7 +58,7 @@ def mission_detail(request, slug):
     mission = {**mission, 'options': SystemRandom().sample(mission['options'], len(mission['options']))}
     latest = Attempt.objects.filter(user=request.user, mission_slug=slug).order_by('-created_at', '-pk').first()
     public = {k: v for k, v in mission.items() if k not in ('solution', 'answer', 'quiz_explanation')}
-    return render(request, 'academy/mission.html', {'mission': mission, 'mission_data': public, 'number': index + 1, 'missions': MISSIONS, 'code': latest.code if latest else mission['starter'], 'latest': latest, 'next_mission': MISSIONS[index + 1] if index + 1 < len(MISSIONS) else None})
+    return render(request, 'academy/mission.html', {'mission': mission, 'mission_data': public, 'number': index + 1, 'missions': MISSIONS, 'code': latest.code if latest else mission['starter'], 'latest': latest, 'next_mission': MISSIONS[index + 1] if index + 1 < len(MISSIONS) else None, 'previous_mission': MISSIONS[index - 1] if index > 0 else None, 'mission_navigation': build_mission_navigation(request.user, slug)})
 
 
 @login_required

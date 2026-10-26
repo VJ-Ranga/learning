@@ -1,5 +1,5 @@
 from django.contrib.auth.models import User
-from django.db.models import Max
+from django.db.models import Max, Count, Q
 from .curriculum import MISSIONS
 from .models import Attempt
 
@@ -13,6 +13,18 @@ def progress(user):
         leaderboard.append({'username': learner.username, 'xp': sum(r['best'] for r in records), 'completed': Attempt.objects.filter(user=learner, version=1, passed=True).values('mission_slug').distinct().count(), 'is_you': learner.pk == user.pk})
     leaderboard.sort(key=lambda row: (-row['xp'], -row['completed'], row['username'].casefold()))
     return {'best': best, 'completed_slugs': list(completed), 'completed': len(completed), 'xp': sum(best.values()), 'total': len(MISSIONS), 'percent': round(len(completed) / len(MISSIONS) * 100), 'leaderboard': leaderboard}
+
+
+def build_mission_navigation(user, current_slug):
+    records = {row['mission_slug']: row for row in Attempt.objects.filter(user=user, version=1).values('mission_slug').annotate(best=Max('score'), passes=Count('pk', filter=Q(passed=True)))}
+    navigation = []
+    for number, mission in enumerate(MISSIONS, 1):
+        record = records.get(mission['slug'])
+        navigation.append({'slug': mission['slug'], 'title': mission['title'], 'number': number,
+                           'current': mission['slug'] == current_slug,
+                           'best': record['best'] if record else None,
+                           'status': 'Completed' if record and record['passes'] else 'In progress' if record else 'Not started'})
+    return navigation
 
 
 def check_checkpoint(mission, payload):

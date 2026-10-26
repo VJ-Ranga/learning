@@ -52,6 +52,10 @@ The editor keeps separate lesson-practice and challenge device drafts per learne
 
 Download runnable worked programs from the sidebar. The Python files in `terminal-programs/` also run directly on a computer. Local runs do not automatically report results to the website.
 
+## Revisit previous lessons
+
+Every mission has Previous mission / All missions / Next mission links and a numbered map of all ten missions. The current lesson is highlighted; completed and in-progress marks are displayed separately. Use Back to lesson inside a challenge to reread explanations and examples. Navigating does not change marks, and device challenge drafts remain available when you return. Journey cards explicitly open their named lesson; a partial result such as 80/100 is marked In progress, not Completed.
+
 ## Scores and honest limits
 
 - Program checks contribute 80 marks; the checkpoint contributes 20.
@@ -180,3 +184,5 @@ References: [Vercel Django](https://vercel.com/docs/frameworks/full-stack/django
 `scripts/checkpoint_check.cjs` verifies separate editors, migration of legacy example drafts, challenge draft preservation after tab switches/reloads, separate terminal outputs and mobile layout. It uses a fresh browser context and does not submit attempts. Set `QUEST_BASE_URL` to choose local or hosted verification.
 
 `scripts/feedback_check.cjs` verifies immediate correct/incorrect feedback, stale-result clearing, per-step prompt copying and manual-copy fallback, large next navigation and completion feedback on desktop/mobile. It uses a contract response fixture for program-save feedback so real learner marks are not modified.
+
+`scripts/navigation_check.cjs` verifies exact dashboard-card destinations, previous/next boundaries, all-mission map jumps, back-to-lesson behavior, draft preservation across navigation, mobile layout and unchanged marks. It never submits an attempt.

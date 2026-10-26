@@ -153,6 +153,9 @@
     $('workflow-description').textContent = mode === 'learn' ? 'Read the explanations, run the example, then press Next: try your mission.' : 'Write your program → check your checkpoint answer → check and save the program. Look for Mission complete before moving on.';
   }
   document.querySelectorAll('[data-pane]').forEach(tab => tab.addEventListener('click', () => showPane(tab.dataset.pane)));
+  document.querySelectorAll('[data-back-to-lesson]').forEach(button => button.addEventListener('click', () => {
+    showPane('learn-pane'); $('learn-tab').focus(); $('learn-tab').scrollIntoView({block:'start'});
+  }));
   $('go-challenge').onclick = () => { showPane('challenge-pane'); $('challenge-tab').focus(); };
   function saveDraft() {
     states[mode].code = editor.value;
@@ -197,6 +200,7 @@
   function busy(value) {
     for (const id of ['run-code', 'check-code', 'reset-code', 'load-example', 'learn-tab', 'challenge-tab', 'go-challenge', 'check-question']) $(id).disabled = value;
     document.querySelectorAll('[name=quiz]').forEach(radio => { radio.disabled = value; });
+    document.querySelectorAll('[data-back-to-lesson]').forEach(button => { button.disabled = value; });
     editor.readOnly = value;
     $('stop-code').hidden = !value;
   }
