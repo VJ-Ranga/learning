@@ -1,6 +1,6 @@
 # Python Quest — learning roadmap and platform proposal
 
-Status: Draft for review. Curriculum and product plan only; implementation has not started.
+Status: First foundation chapter implemented. Updated access decision: only the two pre-provisioned learners vjranga and shanesha; public registration is disabled. The longer curriculum below remains the future roadmap.
 Date: 2026-10-26
 Location: Standalone child folder of Programming_Learning. No dependency on the existing multi-language platform.
 Repository: The owner will create the Git repository later. No Git initialization, commits or deployment are part of this plan.

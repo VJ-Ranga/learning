@@ -5,7 +5,6 @@ import zipfile
 from datetime import timedelta
 from pathlib import Path
 from django.conf import settings
-from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.views import LoginView
 from django.db import transaction
@@ -15,7 +14,6 @@ from django.utils import timezone
 from django.views.decorators.clickjacking import xframe_options_exempt
 from django.views.decorators.http import require_GET, require_POST
 from .curriculum import MISSIONS, BY_SLUG
-from .forms import JoinForm
 from .models import Attempt, AuthWindow
 from .services import assess, progress
 
@@ -40,18 +38,6 @@ class QuestLoginView(LoginView):
             return render(request, 'registration/limited.html', status=429)
         return super().post(request, *args, **kwargs)
 
-
-def join(request):
-    if request.user.is_authenticated:
-        return redirect('dashboard')
-    if request.method == 'POST' and auth_limited(request, 'join'):
-        return render(request, 'registration/limited.html', status=429)
-    form = JoinForm(request.POST or None)
-    if request.method == 'POST' and form.is_valid():
-        user = form.save()
-        login(request, user)
-        return redirect('dashboard')
-    return render(request, 'registration/join.html', {'form': form})
 
 
 @login_required

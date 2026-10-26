@@ -10,9 +10,9 @@ Python 3.12+ is required. From this folder:
 ./start.sh
 ```
 
-Open **http://127.0.0.1:8001/join/**. Create your own username and password. The room invite code is in the private `.env` file under `ENROLLMENT_CODE`; both learners use the same code. Do not commit this file.
+Open **http://127.0.0.1:8001/login/**. The only learner accounts are **vjranga** and **shanesha**; there is no registration. Their random initial passwords are in the private `.env.learners` file. Do not commit or publicly share that file. Each learner can change their password using **Change password** in the navigation.
 
-The launcher creates local environment settings once, applies migrations and starts the development server. It uses local SQLite, which keeps progress across restarts. It listens only on this computer. Your friend needs the hosted deployment to access it remotely.
+The launcher creates local environment settings once, applies migrations, provisions the two learners and starts the development server. Provisioning preserves existing passwords, so starting the app again does not reset a password you changed. It uses local SQLite, which keeps progress across restarts. It listens only on this computer. Your friend needs the hosted deployment to access it remotely.
 
 On Ubuntu, if creating a virtual environment fails because ensurepip is missing, install the matching `python3-venv` package, then retry. In this workspace a working `.venv` has already been prepared.
 
@@ -25,6 +25,7 @@ python -m venv .venv
 python -m pip install -r requirements.txt
 python scripts/init_local.py
 python manage.py migrate
+python manage.py provision_learners
 python manage.py runserver 127.0.0.1:8001
 ```
 
@@ -56,7 +57,7 @@ Download runnable worked programs from the sidebar. The Python files in `termina
 - Program checks contribute 80 marks; the checkpoint contributes 20.
 - A mission completes only when all output checks pass and the checkpoint is correct.
 - XP is the sum of each mission's best mark, at most 100 per mission / 1,000 per chapter. Retries cannot farm XP or erase a better result.
-- The private leaderboard includes active learner accounts; staff are excluded.
+- The private leaderboard compares the two active learner accounts; staff are excluded.
 - Checks verify output, not that a learner used a particular language construct or understood the solution. Explain your approach to your partner and rebuild worked solutions independently.
 - Browser execution reports are **unverified practice evidence**. The server compares reported output against its own expected results and marks the quiz, but a motivated user can forge browser results. This version is unsuitable for hiring exams or formal grading.
 - The first slice deliberately omits badges, daily recall scheduling, progression locks, independent challenge variants and automatic explanation/project grading. These remain in the broader roadmap.
@@ -88,11 +89,10 @@ Set these environment variables in Vercel:
 | `DJANGO_DEBUG` | `0` |
 | `DJANGO_SECRET_KEY` | A new long random secret, e.g. generated with `python -c "import secrets; print(secrets.token_urlsafe(64))"` |
 | `DATABASE_URL` | Neon pooled PostgreSQL URL with SSL |
-| `ENROLLMENT_CODE` | A new private room invitation code |
 | `DJANGO_ALLOWED_HOSTS` | Your exact Vercel hostname, e.g. `your-project.vercel.app`; comma-separated if needed |
 | `DJANGO_CSRF_TRUSTED_ORIGINS` | `https://your-project.vercel.app` and any actual custom-domain origin, comma-separated |
 
-Vercel's supplied deployment and production hostnames are added to the allowlist automatically. No wildcard host permission is required. If enrollment should close after both users join, remove `ENROLLMENT_CODE` and redeploy; existing accounts remain usable.
+Vercel's supplied deployment and production hostnames are added to the allowlist automatically. No wildcard host permission is required. Registration is disabled in the application; no invite code is needed.
 
 ### 4. Apply database migrations deliberately
 
@@ -106,13 +106,22 @@ python scripts/with_env.py .env.local migrate --noinput
 
 Check which database/environment you are targeting first. Do not run migrations during every request or run preview migrations against production. Never commit downloaded environment files.
 
-Optional administration: use `python scripts/with_env.py .env.local createsuperuser` with the same target environment. The normal learner accounts are created through `/join/`. No default administrator or learner password ships with the application.
+Create the two hosted learners after migrations, using the **same private initial-password file** generated locally:
+
+```bash
+python scripts/with_env.py .env.local provision_learners --password-file .env.learners
+```
+
+This runs against the selected Neon database, creates only `vjranga` and `shanesha`, and preserves accounts/passwords that already exist. Passwords are hashed by Django and never embedded in source code or exposed in a public registration page. The file stays on your computer; do not upload it to GitHub or Vercel. If the learners have changed their local passwords, this file still holds the original generated passwords; use their own Change password page after first hosted login.
+
+Optional administration: use `python scripts/with_env.py .env.local createsuperuser` with the same target environment. No administrator password ships with the application.
 
 ### 5. Deploy and verify
 
 Deploy via Vercel, then verify the real HTTPS URL:
 
-- Each person joins and logs in with a separate account.
+- Log in separately as `vjranga` and `shanesha`; verify that `/join/` is unavailable.
+- Verify that each learner can change their own password while preserving progress.
 - A solved mission saves after logout/login.
 - Both accounts appear on the shared leaderboard.
 - A retry does not add duplicate XP.
@@ -121,7 +130,7 @@ Deploy via Vercel, then verify the real HTTPS URL:
 
 Vercel Hobby and Neon Free have usage allowances. This personal learning project is intended to fit within them initially, not guaranteed to stay free at arbitrary usage. Confirm their current limits at setup. A custom domain is optional.
 
-The local SQLite data is not copied to Neon automatically. Begin with new hosted learner accounts, or explicitly plan a data migration if local progress needs preserving.
+The local SQLite data is not copied to Neon automatically. Provision the two named learners in Neon, or explicitly plan a data migration if local progress needs preserving.
 
 ### Backup progress
 
@@ -135,8 +144,8 @@ This file contains personal data, code and password hashes. Store it privately o
 
 ## Security and runtime boundaries
 
-- Django password hashing, sessions, CSRF, per-account attempt access and invite-only registration.
-- Login/join requests are limited to 20 per five-minute source-IP window using shared database state. IP values are hashed in throttle records. The reverse proxy's IP behavior must be checked on the deployed site.
+- Django password hashing, sessions, CSRF, per-account attempt access and two pre-provisioned learner accounts. Public registration is disabled.
+- Login requests are limited to 20 per five-minute source-IP window using shared database state. IP values are hashed in throttle records. The reverse proxy's IP behavior must be checked on the deployed site.
 - Hosted configuration fails closed without a secret or PostgreSQL URL, and rejects debug mode on Vercel.
 - Learner code runs in a sandboxed iframe with an opaque origin and a fresh disposable worker. The frame has no same-origin privileges, cannot read the host page's cookies/DOM and cannot submit forms or navigate the parent.
 - The runner pins Pyodide 0.27.7 because its classic-worker mode works in this opaque-origin sandbox. It uses Python 3.12 in the browser. Do not switch blindly to a module-only Pyodide release; opaque-origin module workers are not compatible with this setup in Chrome.
@@ -154,9 +163,9 @@ python manage.py collectstatic --noinput
 python manage.py check --deploy
 ```
 
-`academy/tests.py` covers account access, enrollment, shared throttling, score calculation, retry behavior, malformed input, draft privacy, terminal examples and deployment configuration. The only subprocess execution is in tests for the trusted authored terminal examples, never in request handling.
+`academy/tests.py` covers account access, disabled registration, learner provisioning, password changes, shared throttling, score calculation, retry behavior, malformed input, draft privacy, terminal examples and deployment configuration. The only subprocess execution is in tests for the trusted authored terminal examples, never in request handling.
 
-`scripts/browser_check.cjs` is a development-only Playwright journey. Install Playwright separately, set `PLAYWRIGHT_PACKAGE` to its module if necessary, and use a disposable local database. It registers QA accounts; do not run against production. It exercises input, saved results, missing input, timeouts, output limits, iframe isolation and mobile layouts. Runtime dependency downloads need internet.
+`scripts/browser_check.cjs` is a development-only Playwright journey. Install Playwright separately, set `PLAYWRIGHT_PACKAGE` to its module if necessary, and use a disposable local database. It logs in as a provisioned learner using `.env.learners` or `TEST_USERNAME` / `TEST_PASSWORD`, and submits practice attempts. Use only a disposable database; do not run it against real learner data or production. It exercises input, saved results, missing input, timeouts, output limits, iframe isolation and mobile layouts. Runtime dependency downloads need internet.
 
 ## Structure
 

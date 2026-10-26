@@ -7,4 +7,5 @@ if [[ ! -x .venv/bin/python ]]; then
 fi
 .venv/bin/python scripts/init_local.py
 .venv/bin/python manage.py migrate --noinput
+.venv/bin/python manage.py provision_learners
 exec .venv/bin/python manage.py runserver "127.0.0.1:${PORT:-8001}"

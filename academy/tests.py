@@ -1,9 +1,8 @@
 import json
 from django.contrib.auth.models import User
-from django.test import TestCase, override_settings
+from django.test import TestCase
 
 
-@override_settings(ENROLLMENT_CODE='test-invite')
 class QuestTests(TestCase):
     def setUp(self):
         self.learner = User.objects.create_user('learner', password='Safe-password-123')
@@ -18,17 +17,21 @@ class QuestTests(TestCase):
     def test_dashboard_requires_login(self):
         self.assertEqual(self.client.get('/').status_code, 302)
 
-    def test_invite_is_required_for_registration(self):
-        response = self.client.post('/join/', {'username': 'third', 'password1': 'Third-password-123',
-                                             'password2': 'Third-password-123', 'invite_code': 'wrong'})
-        self.assertEqual(response.status_code, 200)
+    def test_registration_is_disabled(self):
+        self.assertEqual(self.client.get('/join/').status_code, 404)
+        self.assertEqual(self.client.post('/join/', {'username':'third','password1':'Third-password-123','password2':'Third-password-123'}).status_code, 404)
         self.assertFalse(User.objects.filter(username='third').exists())
+        self.assertNotContains(self.client.get('/login/'), 'Join your learning room')
 
-    def test_correct_invite_creates_learner_not_staff(self):
-        response = self.client.post('/join/', {'username': 'third', 'password1': 'Third-password-123',
-                                             'password2': 'Third-password-123', 'invite_code': 'test-invite'})
+    def test_password_change_requires_old_password_and_keeps_session(self):
+        self.client.force_login(self.learner)
+        response = self.client.post('/password/change/', {'old_password':'wrong','new_password1':'New-strong-password-2026','new_password2':'New-strong-password-2026'})
+        self.assertEqual(response.status_code, 200)
+        response = self.client.post('/password/change/', {'old_password':'Safe-password-123','new_password1':'New-strong-password-2026','new_password2':'New-strong-password-2026'})
         self.assertEqual(response.status_code, 302)
-        self.assertFalse(User.objects.get(username='third').is_staff)
+        self.learner.refresh_from_db()
+        self.assertTrue(self.learner.check_password('New-strong-password-2026'))
+        self.assertEqual(self.client.get('/').status_code, 200)
 
     def test_submission_requires_authentication(self):
         self.assertEqual(self.submit().status_code, 302)
@@ -93,19 +96,7 @@ class QuestTests(TestCase):
         protected.force_login(self.learner)
         self.assertEqual(protected.post('/api/missions/hello/attempt/', '{}', content_type='application/json').status_code, 403)
 
-    def test_unicode_invites_validate_without_crashing(self):
-        payload = {'username': 'third', 'password1': 'Third-password-123', 'password2': 'Third-password-123', 'invite_code': 'ආයුබෝවන්'}
-        self.assertEqual(self.client.post('/join/', payload).status_code, 200)
-        self.assertFalse(User.objects.filter(username='third').exists())
-        with self.settings(ENROLLMENT_CODE='ආයුබෝවන්'):
-            self.assertEqual(self.client.post('/join/', payload).status_code, 302)
-            self.assertTrue(User.objects.filter(username='third').exists())
-
-    def test_closed_enrollment_and_auth_throttle(self):
-        with self.settings(ENROLLMENT_CODE=''):
-            response = self.client.post('/join/', {'username': 'third', 'password1': 'Third-password-123', 'password2': 'Third-password-123', 'invite_code': 'test-invite'})
-            self.assertEqual(response.status_code, 200)
-            self.assertFalse(User.objects.filter(username='third').exists())
+    def test_auth_throttle(self):
         for _ in range(20):
             response = self.client.post('/login/', {'username':'nobody', 'password':'wrong'})
         self.assertEqual(response.status_code, 200)
@@ -159,3 +150,35 @@ class DeploymentSettingsTests(TestCase):
         result = self.settings_process(DJANGO_SECRET_KEY='')
         self.assertNotEqual(result.returncode, 0)
         self.assertIn('DJANGO_SECRET_KEY', result.stderr)
+
+
+class LearnerProvisioningTests(TestCase):
+    def test_creates_only_two_learners_with_random_passwords_and_preserves_changes(self):
+        import io
+        import tempfile
+        from pathlib import Path
+        from dotenv import dotenv_values
+        from django.core.management import call_command
+        with tempfile.TemporaryDirectory() as folder:
+            file = Path(folder) / '.env.learners'
+            output = io.StringIO()
+            call_command('provision_learners', password_file=str(file), stdout=output)
+            values = dotenv_values(file)
+            self.assertEqual(set(User.objects.values_list('username', flat=True)), {'vjranga', 'shanesha'})
+            self.assertNotEqual(values['VJRANGA_PASSWORD'], values['SHANESHA_PASSWORD'])
+            for username in ('vjranga', 'shanesha'):
+                password = values[username.upper() + '_PASSWORD']
+                user = User.objects.get(username=username)
+                self.assertGreaterEqual(len(password), 20)
+                self.assertTrue(user.check_password(password))
+                self.assertFalse(user.is_staff or user.is_superuser)
+                self.assertNotIn(password, output.getvalue())
+                self.assertTrue(self.client.login(username=username, password=password))
+                self.client.logout()
+            user = User.objects.get(username='vjranga')
+            user.set_password('Changed-later-strong-password')
+            user.save()
+            call_command('provision_learners', password_file=str(file), stdout=output)
+            user.refresh_from_db()
+            self.assertTrue(user.check_password('Changed-later-strong-password'))
+            self.assertEqual(User.objects.count(), 2)
