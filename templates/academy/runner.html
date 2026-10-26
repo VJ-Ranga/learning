@@ -1,0 +1,88 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Python runner</title></head><body>
+<script id="worker-source" type="text/plain">
+(async () => {
+importScripts('https://cdn.jsdelivr.net/pyodide/v0.27.7/full/pyodide.js');
+const py = await loadPyodide({indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.27.7/full/'});
+self.postMessage({type: 'ready'});
+self.onmessage = async ({data}) => {
+  try {
+    py.globals.set('_quest_source', data.code);
+    py.globals.set('_quest_cases_json', JSON.stringify(data.cases));
+    const result = py.runPython(`
+import json as _json, builtins as _builtins, sys as _sys, traceback as _traceback
+
+class _QuestOutput:
+    def __init__(self):
+        self.parts = []
+        self.size = 0
+    def write(self, text):
+        self.size += len(text)
+        if self.size > 10000:
+            raise RuntimeError("Output limit reached. Print fewer lines, then try again.")
+        self.parts.append(text)
+        return len(text)
+    def flush(self):
+        pass
+
+_quest_results = []
+for _case in _json.loads(_quest_cases_json):
+    _lines = iter(_case)
+    _stdout, _stderr, _original_input = _sys.stdout, _sys.stderr, _builtins.input
+    _capture = _QuestOutput()
+    def _quest_input(prompt=""):
+        if prompt:
+            print(prompt, end="")
+        try:
+            return next(_lines)
+        except StopIteration:
+            raise EOFError("Not enough input lines. Add one line for each input() call.")
+    _sys.stdout = _capture
+    _sys.stderr = _capture
+    _builtins.input = _quest_input
+    _error = ""
+    try:
+        exec(compile(_quest_source, "mission.py", "exec"), {"__name__": "__main__"})
+    except BaseException as _exc:
+        _error = "".join(_traceback.format_exception(type(_exc), _exc, _exc.__traceback__))[-3800:]
+    finally:
+        _sys.stdout, _sys.stderr, _builtins.input = _stdout, _stderr, _original_input
+    _quest_results.append({"output": "".join(_capture.parts)[:10000], "error": _error})
+_json.dumps(_quest_results)
+`);
+    self.postMessage({type: 'result', results: JSON.parse(result)});
+  } catch (error) { self.postMessage({type: 'error', error: String(error).slice(0, 3800)}); }
+};
+})().catch(error => self.postMessage({type:'error', error:String(error.stack || error).slice(0,3800)}));
+</script>
+<script>
+(() => {
+  let worker, loadTimer, runTimer, job;
+  const source = document.getElementById('worker-source').textContent;
+  const stop = () => { if (worker) worker.terminate(); worker = null; clearTimeout(loadTimer); clearTimeout(runTimer); };
+  const send = (message) => parent.postMessage({channel:'python-quest', id:job, ...message}, '*');
+  addEventListener('message', (event) => {
+    if (event.source !== parent || event.data?.channel !== 'python-quest') return;
+    const data = event.data;
+    if (data.type === 'ping') { parent.postMessage({channel:'python-quest',type:'sandbox-ready'}, '*'); return; }
+    if (data.type === 'stop') { stop(); return; }
+    if (data.type !== 'run' || typeof data.code !== 'string' || !Array.isArray(data.cases)) return;
+    stop(); job = data.id;
+    const url = URL.createObjectURL(new Blob([source], {type:'text/javascript'}));
+    try { worker = new Worker(url); } catch (error) { send({type:'error',error:String(error)}); return; }
+    URL.revokeObjectURL(url);
+    send({type:'status', status:'Loading Python…'});
+    loadTimer = setTimeout(() => { stop(); send({type:'error',error:'Python could not load in time. Check your internet connection and try again.'}); }, 90000);
+    worker.onerror = (event) => { stop(); send({type:'error',error:'Could not start Python. Check your connection and retry. ' + (event.message || '')}); };
+    worker.onmessage = ({data: result}) => {
+      if (result.type === 'ready') {
+        clearTimeout(loadTimer);
+        send({type:'status',status:'Running your program…'});
+        runTimer = setTimeout(() => { stop(); send({type:'error',error:'Execution stopped after 8 seconds. Check for an infinite loop or reduce the work your program does.'}); }, 8000);
+        worker.postMessage({code:data.code,cases:data.cases});
+      } else if (result.type === 'result') { send(result); stop(); }
+      else if (result.type === 'error') { send(result); stop(); }
+    };
+  });
+  parent.postMessage({channel:'python-quest',type:'sandbox-ready'}, '*');
+})();
+</script></body></html>
