@@ -10,6 +10,7 @@
   const initialCode = editor.value;
   let mode = 'learn';
   let activeJob = null, sandboxReady = false, checkingCheckpoint = false;
+  let reviewedAnswer = null;
   let resolveReady;
   const ready = new Promise((resolve) => { resolveReady = resolve; });
   const states = {
@@ -49,6 +50,11 @@
     }
   }
   function showCheckpointFeedback(result) {
+    const choice = document.querySelector('[name=quiz]:checked');
+    reviewedAnswer = choice ? {value:choice.value, label:mission.options.find(([value])=>value === choice.value)?.[1], correct:result.correct, explanation:result.explanation} : null;
+    $('mission-ai-prompt').disabled = !reviewedAnswer;
+    $('mission-prompt-help').textContent = reviewedAnswer ? 'Your answer has been checked. Copy this prompt for a deeper explanation of why it is right or wrong.' : 'Check your answer first to unlock this explanation prompt.';
+
     const box = $('checkpoint-feedback'); box.hidden = false;
     box.className = `checkpoint-feedback ${result.correct ? 'is-correct' : 'is-incorrect'}`;
     box.replaceChildren();
@@ -69,6 +75,10 @@
     }
   }
   function clearCheckpointFeedback() {
+    reviewedAnswer = null;
+    $('mission-ai-prompt').disabled = true;
+    $('mission-prompt-help').textContent = 'Check your answer first to unlock an explanation prompt about your answer and feedback.';
+
     if (states.challenge.feedback?.summary) {
       states.challenge.feedback = null;
       if (mode === 'challenge') $('feedback').hidden = true;
@@ -102,23 +112,15 @@
   };
   function explanationPrompt(button) {
     const intro = `I am a Python beginner with general IT knowledge, learning Python Quest: "${mission.title}". Explain in simple English, step by step. Define new terms and use a small everyday example.`;
-    const kind = button.dataset.promptKind;
-    let context;
-    if (kind === 'section') {
-      const [heading, text] = mission.sections[Number(button.dataset.step)];
-      context = `Lesson step: ${heading}\nExplanation I am studying: ${text}\nRelated example:\n${mission.example}`;
-    } else if (kind === 'example') context = `Explain each line of this example, then trace how its values and output change:\n${mission.example}`;
-    else if (kind === 'trace') context = `Help me understand this execution trace:\n${mission.trace.join('\n')}\nCode:\n${mission.example}`;
-    else if (kind === 'checkpoint') {
-      const choice = document.querySelector('[name=quiz]:checked');
-      const label = choice ? mission.options.find(([value]) => value === choice.value)?.[1] : 'not chosen yet';
-      context = `Checkpoint: ${mission.question}\nCode:\n${mission.question_code}\nChoices: ${mission.options.map(([,label]) => label).join('; ')}\nMy choice: ${label}`;
-      if (!$('checkpoint-feedback').hidden) context += `\nFeedback I received: ${$('checkpoint-feedback').textContent}`;
-    } else context = `Challenge requirements: ${mission.challenge}\nMy current challenge code:\n${mode === 'challenge' ? editor.value : states.challenge.code}\nMy last challenge output:\n${mode === 'challenge' ? output.textContent : states.challenge.output}`;
-    return `${intro}\n\n${context}\n\nHelp me reason about why the code works or fails. Ask me one small question to check understanding, and give a similar practice exercise. Guide me with hints first; do not immediately write the full solution to my challenge.`;
+    if (button.dataset.promptKind === 'lesson') {
+      return `${intro}\n\nConcepts: ${mission.concepts.join(', ')}\n\nFull lesson:\n${mission.sections.map(([heading,text])=>heading+'\n'+text).join('\n\n')}\n\nWorked example:\n${mission.example}\n\nExecution trace:\n${mission.trace.join('\n')}\n\nExplain the whole lesson and walk through the example line by line. Give a similar example, then ask me a small question to check understanding. Do not solve the upcoming mission for me.`;
+    }
+    if (!reviewedAnswer) return null;
+    return `${intro}\n\nMission requirements: ${mission.challenge}\n\nCheckpoint question: ${mission.question}\nCode:\n${mission.question_code}\nChoices: ${mission.options.map(([,label])=>label).join('; ')}\n\nMy checked answer: ${reviewedAnswer.label}\nResult: ${reviewedAnswer.correct ? 'correct' : 'incorrect'}\nFeedback: ${reviewedAnswer.explanation}\n\nMy challenge code:\n${mode === 'challenge' ? editor.value : states.challenge.code}\nLast challenge output:\n${mode === 'challenge' ? output.textContent : states.challenge.output}\n\nExplain why my checked answer is right or wrong. Trace the code step by step, point out any misunderstanding, and give a different small practice question. Help me understand the reasoning rather than just memorizing the answer.`;
   }
   document.querySelectorAll('[data-prompt-kind]').forEach(button => button.addEventListener('click', async () => {
     const text = explanationPrompt(button);
+    if (!text) return;
     try {
       await navigator.clipboard.writeText(text);
       const label = button.dataset.originalLabel || button.textContent; button.dataset.originalLabel = label; button.textContent = 'Copied ✓ — paste into any AI';
