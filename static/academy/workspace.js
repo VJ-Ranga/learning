@@ -14,7 +14,7 @@
   const ready = new Promise((resolve) => { resolveReady = resolve; });
   const states = {
     learn: {code:mission.example, input:initialInput, output:'Run the example, change it, and see what happens.'},
-    challenge: {code:initialCode, input:initialInput, output:'Write your own program. Expected output describes the goal.'}
+    challenge: {code:initialCode === mission.example ? mission.starter : initialCode, input:initialInput, output:'Write your own program. Expected output describes the goal.'}
   };
   try {
     const legacy = localStorage.getItem(legacyKey);
