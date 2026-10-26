@@ -15,7 +15,7 @@
   let resolveReady;
   const ready = new Promise((resolve) => { resolveReady = resolve; });
   const states = {
-    learn: {code:mission.example, input:initialInput, output:'Run the example, change it, and see what happens.'},
+    learn: {code:'', input:initialInput, output:'Type the example yourself, then press Run code.'},
     challenge: {code:initialCode === mission.example ? mission.starter : initialCode, input:initialInput, output:'Write your own program. Expected output describes the goal.'}
   };
   try {
@@ -25,7 +25,6 @@
     if (challengeDraft !== null) states.challenge.code = challengeDraft;
     else if (legacy !== null && legacy !== mission.example) states.challenge.code = legacy;
     if (practiceDraft !== null) states.learn.code = practiceDraft;
-    else if (legacy === mission.example) states.learn.code = legacy;
   } catch {}
   function notify(message, success, summary = null) {
     states[mode].feedback = {message, success, summary};
@@ -195,12 +194,12 @@
     if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) { event.preventDefault(); run(false); }
   });
   $('load-example').onclick = () => {
-    if (editor.value !== mission.example && !confirm('Replace this practice draft with the lesson example? Your challenge draft stays separate.')) return;
+    if (editor.value.trim() && editor.value !== mission.example && !confirm('Replace this practice draft with the lesson example? Your challenge draft stays separate.')) return;
     editor.value = mission.example; saveDraft(); editor.focus();
   };
   $('reset-code').onclick = () => {
-    if (!confirm(mode === 'learn' ? 'Reset your practice draft to the lesson example? Your challenge work stays separate.' : 'Reset your challenge draft to its starter? Submitted attempts remain saved.')) return;
-    editor.value = mode === 'learn' ? mission.example : mission.starter; saveDraft();
+    if (!confirm(mode === 'learn' ? 'Clear your practice editor? Your challenge work stays separate.' : 'Reset your challenge draft to its starter? Submitted attempts remain saved.')) return;
+    editor.value = mode === 'learn' ? '' : mission.starter; saveDraft();
   };
   $('download-code').onclick = () => {
     const url = URL.createObjectURL(new Blob([editor.value], {type:'text/x-python'}));
